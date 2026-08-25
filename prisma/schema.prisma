@@ -1,0 +1,57 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Same shape as Worth-Contacting CRM (#12)'s Lead + scoring — "next to the
+// live pipeline" from the catalog pitch means this product's own lead list
+// IS a scored pipeline view, not a separate unscored geography table.
+// phaseId is the new part: which expansion-sequence bucket this lead has
+// been assigned to (nullable — most leads start unassigned, in the
+// "candidate" pool the geography dashboard surfaces).
+model Lead {
+  id          Int       @id @default(autoincrement())
+  name        String
+  category    String?
+  address     String?
+  phone       String?
+  website     String?
+  rating      Float?
+  reviewCount Int?
+  city        String?
+  country     String?
+  score       Int       @default(0)
+  reasons     String    @default("")
+  status      String    @default("NEW")
+  phaseId     Int?
+  createdAt   DateTime  @default(now())
+  deletedAt   DateTime?
+
+  phase ExpansionPhase? @relation(fields: [phaseId], references: [id])
+
+  @@index([score])
+  @@map("leads")
+}
+
+// New — not a literal port of leadMarketing's numeric Lead.phase (1=Europe|
+// 2=Dubai|3=USA), which is a fixed internal enum with no meaning for a
+// standalone customer (same reasoning as dropping it from WhatsApp-Only CRM
+// #13 and Warmup-as-a-Service #14). Here "phase" is the actual product
+// concept — a customer-defined, ordered expansion-sequence bucket ("Phase 1:
+// East Coast", "Phase 2: Midwest") that leads get assigned into as the
+// rollout plan solidifies. `order` drives the sequencing UI.
+model ExpansionPhase {
+  id        Int      @id @default(autoincrement())
+  name      String
+  order     Int      @default(0)
+  notes     String?
+  createdAt DateTime @default(now())
+
+  leads Lead[]
+
+  @@map("expansion_phases")
+}
